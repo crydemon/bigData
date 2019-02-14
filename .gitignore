@@ -1,5 +1,5 @@
-src/main/resources
 .git
 .idea
 target
 *.class
+src/main/resources
