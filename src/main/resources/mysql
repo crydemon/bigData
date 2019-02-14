@@ -1,0 +1,3 @@
+url = jdbc:mysql://192.168.4.179:13084/themis_logistics_report?useUnicode=true&characterEncoding=utf8
+user = qwang
+password = cjaHDKh
