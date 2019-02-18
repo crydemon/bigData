@@ -3,7 +3,6 @@ package sql
 import java.io.File
 
 import org.apache.spark.sql.SparkSession
-import sql.SparkSql3866.spark
 import utils.FileUtils
 
 object SparkSql3866 extends App {
