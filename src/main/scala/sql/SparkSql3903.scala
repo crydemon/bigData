@@ -1,36 +1,24 @@
 package sql
 
-import java.io.{File, FileInputStream, FileWriter}
-import java.util.Properties
+import java.io.{File, FileWriter}
+import utils.DataSource._
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{SparkSession}
 import utils.FileUtils
 
 object SparkSql3903 extends App {
+
   val spark = SparkSession
     .builder()
     .master("local[*]")
     .getOrCreate()
 
+
   FileUtils.dirDel(new File("D:/result"))
-
-  import spark.implicits._
-
-  val prop = new Properties()
-  val file = new File("src/main/resources/themis")
-  val in = new FileInputStream(file)
-  prop.load(in)
-  val url = prop.getProperty("url")
-
-  println(url)
-  println(prop)
-
 
   import scala.io.Source
 
   val src = Source.fromFile("d://users.csv", "utf-8")
-
-
   val userSource = src.getLines
     .filter(x => x.matches("[0-9]*"))
     .map(l => (l + ", "))
@@ -38,7 +26,6 @@ object SparkSql3903 extends App {
   val out = new FileWriter("d://result.csv", false)
   val head = "user_id,language_id,language_code,country_id,country_code\n"
   out.write(head)
-  out.flush()
 
   var i = 1
   var users = ""
@@ -50,7 +37,7 @@ object SparkSql3903 extends App {
         users + "\n" +
         ")) as tmp"
       println(table3)
-      spark.read.jdbc(url, table3, prop)
+      loadTable(spark, "themis", table3)
         .distinct()
         .foreach(row => {
           val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "\n";
@@ -62,7 +49,7 @@ object SparkSql3903 extends App {
     i = i + 1
   }
 
-  spark.read.jdbc(url, table3, prop)
+  loadTable(spark, "themis", table3)
     .distinct()
     .foreach(row => {
       val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "\n";
@@ -115,7 +102,6 @@ object SparkSql3903_1 extends App {
     .option("delimiter", ",")
     .csv("d:\\result")
 
-  import spark.implicits._
 
 }
 

@@ -9,14 +9,6 @@ object DataSource {
   private val themisPath = "src/main/resources/themis"
   private val reportPath = "src/main/resources/mysql"
 
-  private def getProp(path: => String): Properties = {
-    val prop = new Properties()
-    val in = new FileInputStream(new File(path))
-    prop.load(in)
-    in.close()
-    prop
-  }
-
   private lazy val themisProp = getProp(themisPath)
   private lazy val reportProp = getProp(reportPath)
 
@@ -33,6 +25,14 @@ object DataSource {
     spark
       .read
       .jdbc(url, table, prop)
+  }
+
+  private def getProp(path: => String): Properties = {
+    val prop = new Properties()
+    val in = new FileInputStream(new File(path))
+    prop.load(in)
+    in.close()
+    prop
   }
 
   def main(args: Array[String]): Unit = {
