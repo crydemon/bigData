@@ -1,9 +1,9 @@
 package sql
 
-import java.io.{File, FileInputStream}
+import java.io.{File, FileInputStream, FileWriter}
 import java.util.Properties
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import utils.FileUtils
 
 object SparkSql3903 extends App {
@@ -17,7 +17,7 @@ object SparkSql3903 extends App {
   import spark.implicits._
 
   val prop = new Properties()
-  val file = new File("src/main/resources/mysql")
+  val file = new File("src/main/resources/themis")
   val in = new FileInputStream(file)
   prop.load(in)
   val url = prop.getProperty("url")
@@ -25,32 +25,60 @@ object SparkSql3903 extends App {
   println(url)
   println(prop)
 
-  val table = "(SELECT " +
-    "inviter_user_id " +
-    "FROM free_sale_invite_record fsir " +
-    "INNER JOIN app_event_log_start_up su ON su.uid = fsir.inviter_user_id " +
-    "WHERE fsir.create_time >= '2019-02-05'      " +
-    "AND fsir.create_time < '2019-02-12'      " +
-    "AND su.event_time >= '2019-02-12' " +
-    "AND su.event_time < '2019-02-19') as users "
 
-  val table1 = "SELECT su.uid " +
-    "FROM appsflyer_record ar " +
-    " LEFT JOIN app_event_log_start_up su ON su.device_id = ar.device_id " +
-    "WHERE ar.install_time >= '2019-02-16' " +
-    "AND ar.install_time < '2019-02-19' " +
-    "AND su.uid > 0"
+  import scala.io.Source
 
-  val table2 = "(SELECT inviter_user_id\nFROM free_sale_invite_record fsir\nWHERE fsir.create_time >= '2019-02-12'\n      AND fsir.create_time < '2019-02-18')" +
-    " as users"
+  val src = Source.fromFile("d://users.csv", "utf-8")
 
-  spark.read.jdbc(url, table2, prop)
+
+  val userSource = src.getLines
+    .filter(x => x.matches("[0-9]*"))
+    .map(l => (l + ", "))
+
+  val out = new FileWriter("d://result.csv", true)
+  val head = "user_id,language_id,language_code,country_id,country_code\n"
+  out.write(head)
+  out.flush()
+
+  var i = 1
+  var users = ""
+  var table3 = ""
+  for (user <- userSource) {
+    if (i % 10000 == 0) {
+      users += "2"
+      table3 = "(SELECT\n  u.user_id,\n  u.language_id,\n  l.code,\n  u.country,\n  r.region_code\nFROM users AS u\n  LEFT JOIN languages l ON l.languages_id = u.language_id\n  LEFT JOIN region r ON r.region_id = u.country\nWHERE u.user_id IN (" +
+        users + "\n" +
+        ")) as tmp"
+      println(table3)
+      spark.read.jdbc(url, table3, prop)
+        .distinct()
+        .foreach(row => {
+          val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "\n";
+          out.write(line)
+        })
+      users = ""
+    }
+    users += user
+    i = i + 1
+  }
+
+  spark.read.jdbc(url, table3, prop)
     .distinct()
-    .coalesce(1)
-    .write
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("d:\\result")
+    .foreach(row => {
+      val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "\n";
+      out.write(line)
+    })
+
+  out.close()
+}
+
+object test extends App {
+
+  import scala.io.Source
+
+  val src = Source.fromFile("d:/users.csv", "utf-8")
+
+  src.getLines.map(l => (l + ", "))
 }
 
 
