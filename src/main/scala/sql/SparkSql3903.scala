@@ -35,7 +35,7 @@ object SparkSql3903 extends App {
     .filter(x => x.matches("[0-9]*"))
     .map(l => (l + ", "))
 
-  val out = new FileWriter("d://result.csv", true)
+  val out = new FileWriter("d://result.csv", false)
   val head = "user_id,language_id,language_code,country_id,country_code\n"
   out.write(head)
   out.flush()

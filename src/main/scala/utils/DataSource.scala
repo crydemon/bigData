@@ -1,27 +1,42 @@
 package utils
 
+import java.io.{File, FileInputStream}
 import java.util.Properties
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object DataSource {
-  def getThemisTable(spark: SparkSession, table: String): DataFrame = {
+  private val themisPath = "src/main/resources/themis"
+  private val reportPath = "src/main/resources/mysql"
+
+  private def getProp(path: => String): Properties = {
     val prop = new Properties()
-    val url = "jdbc:mysql://vovadb-slave-2.cei8p8whxxwd.us-east-1.rds.amazonaws.com:3306/themis?useUnicode=true&characterEncoding=utf8"
-    prop.setProperty("user", "qwang")
-    prop.setProperty("password", "cjaHDKh@r4jdw")
+    val in = new FileInputStream(new File(path))
+    prop.load(in)
+    in.close()
+    prop
+  }
+
+  private lazy val themisProp = getProp(themisPath)
+  private lazy val reportProp = getProp(reportPath)
+
+  def loadTable(spark: SparkSession, database: String, table: String): DataFrame = {
+    val prop =
+      if (database == "themis")
+        themisProp
+      else if (database == "report")
+        reportProp
+      else
+        themisProp
+
+    val url = prop.getProperty("url")
     spark
       .read
       .jdbc(url, table, prop)
   }
 
-  def getReportTable(spark: SparkSession, table: String): DataFrame = {
-    val prop = new Properties()
-    val url = "jdbc:mysql://vovadb-slave-2.cei8p8whxxwd.us-east-1.rds.amazonaws.com:3306/themis?useUnicode=true&characterEncoding=utf8"
-    prop.setProperty("user", "qwang")
-    prop.setProperty("password", "cjaHDKh@r4jdw")
-    spark
-      .read
-      .jdbc(url, table, prop)
+  def main(args: Array[String]): Unit = {
+    themisProp
+    themisProp
   }
 }
