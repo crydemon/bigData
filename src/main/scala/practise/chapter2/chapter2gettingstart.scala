@@ -1,4 +1,4 @@
-package practise
+package practise.chapter2
 
 //高阶函数倾向使用短的函数名
 object MyModule {
