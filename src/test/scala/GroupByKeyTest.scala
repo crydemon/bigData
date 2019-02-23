@@ -1,5 +1,3 @@
-package practise
-
 import org.apache.spark.sql.SparkSession
 
 object GroupByKeyTest {

@@ -1,4 +1,4 @@
-package practise
+package practise.chapter5
 
 //by name
 object nonstrictness extends App {

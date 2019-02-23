@@ -1,5 +1,6 @@
-package practise
+package practise.chapter6
 
+import practise.chapter6.RNG.SimpleRNG
 
 trait RNG {
   def nextInt: (Int, RNG)
@@ -11,7 +12,6 @@ trait RNG {
 
 
 object RNG {
-
 
   case class SimpleRNG(seed: Long) extends RNG {
     override def nextInt: (Int, RNG) = {
@@ -221,7 +221,7 @@ object State {
 
 object test extends App {
 
-  import practise.RNG._
+  import practise.chapter6.RNG._
 
 
   val rng = SimpleRNG(43)
@@ -248,7 +248,7 @@ case class Machine(locked: Boolean, candies: Int, coins: Int)
 
 object Candy {
 
-  import practise.State._
+  import practise.chapter6.State._
 
   def update = (i: Input) => (s: Machine) =>
     (i, s) match {

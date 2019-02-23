@@ -1,6 +1,8 @@
-package practise
+package practise.chapter5
+
 
 //提升内存效率的流式计算
+//惰性化分离了表达式的描述和求值
 sealed trait Stream[+A] {
 
   import Stream._
@@ -58,6 +60,19 @@ sealed trait Stream[+A] {
   def takeWhile(f: A => Boolean): Stream[A] = this match {
     case Cons(h, t) if f(h()) => cons(h(), t().takeWhile(f))
     case _ => empty[A]
+  }
+
+  def takeWhile_1(f: A => Boolean): Stream[A] = {
+    def go(s: Stream[A], f: A => Boolean, acc: Stream[A]): Stream[A] = s match {
+      case Cons(h, t) if f(h()) => go(t(), f, cons(h(), acc))
+      case _ => acc
+    }
+
+    go(this, f, empty).reverse
+  }
+
+  def reverse: Stream[A] = {
+    Stream.apply(this.toList.reverse: _*)
   }
 
   def takeWhile1(p: A => Boolean): Stream[A] =
@@ -162,10 +177,17 @@ sealed trait Stream[+A] {
       (b2, cons(b2, p1._2))
     })._2
 
+//  def exists[A](p: A => Boolean): Boolean = this match {
+//    case Cons(h, t) => p(h()) || t().exists(p)
+//    case _ => false
+//  }
 }
 
 case object Empty extends Stream[Nothing]
 
+//必须显示声明thunk
+// I assume it is because case-classes need access to the constructor values of other instances,
+// because they implement the equals method.
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
 
 object Stream {
@@ -248,6 +270,8 @@ object test1 extends App {
   println(x.drop(4).toList)
   println("------------------------")
   println(x.takeWhile1((x: Int) => (x < 6)).toList)
+  println(x.takeWhile_1((x: Int) => (x < 6)).toList)
+  println("----------------------------------")
   println(x.filter((x: Int) => (x < 4)).toList)
   println(x.find((x: Int) => (x >= 4)).toList)
 }
