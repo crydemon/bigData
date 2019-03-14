@@ -18,13 +18,13 @@ object SparkSql3903 extends App {
 
   import scala.io.Source
 
-  val src = Source.fromFile("d://users.csv", "utf-8")
+  val src = Source.fromFile("d://user_id0304.csv", "utf-8")
   val userSource = src.getLines
     .filter(x => x.matches("[0-9]*"))
     .map(l => (l + ", "))
 
   val out = new FileWriter("d://result.csv", false)
-  val head = "user_id,language_id,language_code,country_id,country_code\n"
+  val head = "user_id,email,language_id,language_code,country_id,country_code\n"
   out.write(head)
 
   var i = 1
@@ -33,14 +33,14 @@ object SparkSql3903 extends App {
   for (user <- userSource) {
     if (i % 10000 == 0) {
       users += "2"
-      table3 = "(SELECT\n  u.user_id,\n  u.language_id,\n  l.code,\n  u.country,\n  r.region_code\nFROM users AS u\n  LEFT JOIN languages l ON l.languages_id = u.language_id\n  LEFT JOIN region r ON r.region_id = u.country\nWHERE u.user_id IN (" +
+      table3 = "(SELECT\n  u.user_id,\n u.email,\n  u.language_id,\n  l.code,\n  u.country,\n  r.region_code\nFROM users AS u\n  LEFT JOIN languages l ON l.languages_id = u.language_id\n  LEFT JOIN region r ON r.region_id = u.country\nWHERE u.user_id IN (" +
         users + "\n" +
         ")) as tmp"
       println(table3)
       loadTable(spark, "themis", table3)
         .distinct()
         .foreach(row => {
-          val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "\n";
+          val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "," + row.get(5) + "\n";
           out.write(line)
         })
       users = ""
@@ -48,11 +48,15 @@ object SparkSql3903 extends App {
     users += user
     i = i + 1
   }
+  users += "2"
+  table3 = "(SELECT\n  u.user_id,\n u.email,\n  u.language_id,\n  l.code,\n  u.country,\n  r.region_code\nFROM users AS u\n  LEFT JOIN languages l ON l.languages_id = u.language_id\n  LEFT JOIN region r ON r.region_id = u.country\nWHERE u.user_id IN (" +
+    users + "\n" +
+    ")) as tmp"
 
   loadTable(spark, "themis", table3)
     .distinct()
     .foreach(row => {
-      val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + "\n";
+      val line = row.get(0) + "," + row.get(1) + "," + row.get(2) + "," + row.get(3) + "," + row.get(4) + row.get(5) + "\n";
       out.write(line)
     })
 

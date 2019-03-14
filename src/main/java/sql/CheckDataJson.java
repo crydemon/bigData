@@ -23,8 +23,17 @@ import org.json.JSONObject;
 public class CheckDataJson {
 
   public static void main(String[] args) throws IOException {
-    pullDataByUsers_idByJson("d:\\user_druid.csv");
+    //pullDataByUsers_idByJson("d:\\user_druid.csv");
+    pullData();
   }
+
+  public static void pullData() throws IOException {
+    File file = new File("src/main/resources/druidQueryJson/4050_exposure_uv.json");
+    final String content = FileUtils.readFileToString(file, "UTF-8");
+    String fileName = "d:\\druidRecord.csv";
+    writeToFileByJson(content, fileName);
+  }
+
 
   public static void pullDataByUsers_idByJson(String filePath) throws IOException {
     FileInputStream fin = new FileInputStream(filePath);
@@ -60,7 +69,7 @@ public class CheckDataJson {
   private static void writeToFileByJson(String json, String fileName) throws IOException {
     CloseableHttpClient client = HttpClients.createDefault();
     Properties properties = new Properties();
-    File file= new File("src/main/resources/druid");
+    File file = new File("src/main/resources/druid");
     InputStream in = new FileInputStream(file);
     properties.load(in);
     HttpPost httpPost = new HttpPost(properties.getProperty("urlJson"));
@@ -70,31 +79,43 @@ public class CheckDataJson {
     httpPost.setHeader("Content-type", "application/json");
     CloseableHttpResponse response = client.execute(httpPost);
     HttpEntity entity1 = response.getEntity();
-    //System.out.println(entity1.getContent().read());
     String responseString = EntityUtils.toString(entity1, "UTF-8");
 
     JSONArray jsonArray = new JSONArray(responseString);
+    String content = extractFieldFromJson_greater100uv(fileName, jsonArray);
+    CheckData.writeToCsv(content, fileName);
+  }
+
+  public static String extractFieldFromJson(String fileName, JSONArray jsonArray) {
     String content = "";
     if (!new File(fileName).exists()) {
-      content += "user_unique_id"
-          + "\n";
+      content = "goods_id," + "clicks," + "impressions," + "ctr" + "\n";
     }
-
     for (int i = 0; i < jsonArray.length(); i++) {
       JSONObject event = jsonArray.getJSONObject(i).getJSONObject("event");
-      //System.out.println(event.toString());
-      content +=
-          event.getString("user_unique_id")
-//              + ","
-//              + Optional.ofNullable(event.get("page_code")).orElse("unknown") + ","
-//              + jsonArray.getJSONObject(i).getString("timestamp").substring(0, 10)
-//event.get("page_code") null ->'null'
-              + "\n";
+      content += event.getString("goods_id") + ","
+          + Optional.ofNullable(event.get("sum_clicks")).orElse(0) + ","
+          + Optional.ofNullable(event.get("sum_impressions")).orElse(0) + ","
+          + Optional.ofNullable(event.get("ctr")).orElse(0) + ","
+          + "\n";
     }
-    //System.out.println(content);
-    if (content == null) {
-      return;
+    return content;
+  }
+
+  public static String extractFieldFromJson_greater100uv(String fileName, JSONArray jsonArray) {
+    String content = "";
+    if(jsonArray.isEmpty()) return content;
+    if (!new File(fileName).exists()) {
+      content = "goods_id," + "exposure_uv" + "exposure_pv" + "\n";
     }
-    CheckData.writeToCsv(content, fileName);
+    jsonArray.getJSONObject(0).getJSONObject("event").keys();
+    for (int i = 0; i < jsonArray.length(); i++) {
+      JSONObject event = jsonArray.getJSONObject(i).getJSONObject("event");
+      content += Optional.ofNullable(event.get("page_goods_id")).orElse(0) + ","
+          + Optional.ofNullable(event.get("exposure_uv")).orElse(0) + ","
+          + Optional.ofNullable(event.get("exposure_pv")).orElse(0) + ","
+          + "\n";
+    }
+    return content;
   }
 }
