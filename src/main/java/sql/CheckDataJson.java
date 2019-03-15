@@ -1,12 +1,13 @@
 package sql;
 
 import com.sun.istack.internal.NotNull;
-import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.Properties;
@@ -25,91 +26,110 @@ import org.json.JSONObject;
 public class CheckDataJson {
 
   public static void main(String[] args) throws IOException {
-    //pullDataByUsers_idByJson("d:\\user_druid.csv");
-    pullData();
+    File d = new File("output/druid");
+    d.mkdirs();
+    String queryFileName = "src/main/resources/druidQuery/ctr.json";
+    String outputFileName = "output/druid/ctr.csv";
+    String paramName = "";
+    String paramFile = "";
+    pullData(queryFileName, outputFileName, paramName, paramFile);
   }
 
-  public static void pullData() throws IOException {
-    File file = new File("src/main/resources/druidQueryJson/ctr.json");
-    final String content = FileUtils.readFileToString(file, "UTF-8");
-    String fileName = "d:\\druidRecord.csv";
-    writeToFileByJson(content, fileName);
+  private static void pullData(String queryFileName, String outputFileName, String paramName,
+      String paramFile) throws IOException {
+
+    File file = new File(queryFileName);
+    final String queryText = FileUtils.readFileToString(file, "UTF-8");
+
+    if (!paramName.isEmpty()) {
+      String intParams = JoinIntParam(paramFile);
+      String queryParams = "";
+      int paramCount = 0;
+      for (int i = 0; i < intParams.length(); i++) {
+        if (paramCount == 1000 && intParams.charAt(i) == ',') {
+          String curQuery = queryText.replace(paramName, queryParams);
+          JSONArray druidData = queryDruidByJson(curQuery);
+          String csvText = extractFieldFromJson(outputFileName, druidData);
+          writeToCsv(csvText, outputFileName);
+          paramCount = 0;
+        } else {
+          paramCount++;
+          queryParams += intParams.charAt(i);
+        }
+      }
+
+    } else {
+      JSONArray druidData = queryDruidByJson(queryText);
+      String csvText = extractFieldFromJson(outputFileName, druidData);
+      writeToCsv(csvText, outputFileName);
+    }
+  }
+
+  private static void writeToCsv(String content, String fileName) {
+    try {
+      File csv = new File(fileName);//CSV文件
+      BufferedWriter bw = new BufferedWriter(new FileWriter(csv, true));
+      bw.write(content);
+      bw.flush();
+      bw.close();
+    } catch (FileNotFoundException e) {
+      //捕获File对象生成时的异常
+      e.printStackTrace();
+    } catch (IOException e) {
+      //捕获BufferedWriter对象关闭时的异常
+      e.printStackTrace();
+    }
   }
 
 
-  public static void pullDataByUsers_idByJson(String filePath) throws IOException {
-    FileInputStream fin = new FileInputStream(filePath);
-    InputStreamReader reader = new InputStreamReader(fin);
-    BufferedReader buffReader = new BufferedReader(reader);
-    String user_ids = "";
-    String strTmp;
-    String fileName = "d:\\druidRecord.csv";
-    File file = new File("d:\\scanByUserId.json");
-    final String content = FileUtils.readFileToString(file, "UTF-8");
-    int i = 0;
-//    while ((strTmp = buffReader.readLine()) != null) {
-//      if (strTmp.replace("\n", "").equals("")) {
-//        continue;
-//      }
-//      if(strTmp.matches("[a-zA-z]*")) {
-//        continue;
-//      }
-//      user_ids = user_ids.equals("") ? "" + Integer.valueOf(strTmp)
-//          : user_ids + "," + Integer.valueOf(strTmp);
-//
-//      if (++i % 3000 == 0) {
-//        String tmp = content.replace("\"tmp_pos\"", user_ids);
-//        System.out.println(tmp);
-//        writeToFileByJson(tmp, fileName);
-//        user_ids = "";
-//      }
-//    }
-    String tmp = content.replace("\"tmp_pos\"", user_ids);
-    writeToFileByJson(tmp, fileName);
+  private static String JoinIntParam(String paramFile) {
+    String result = "";
+    try {
+      final String intParams = FileUtils.readFileToString(new File(paramFile), "UTF-8");
+      result = intParams.replaceAll("(\\r\\n)+", ",");
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      return result;
+    }
+
   }
 
-  private static void writeToFileByJson(String json, String fileName) throws IOException {
+
+  private static JSONArray queryDruidByJson(String queryText) throws IOException {
     CloseableHttpClient client = HttpClients.createDefault();
     Properties properties = new Properties();
+    //加载配置文件
     File file = new File("src/main/resources/druid");
     InputStream in = new FileInputStream(file);
     properties.load(in);
     HttpPost httpPost = new HttpPost(properties.getProperty("urlJson"));
-    StringEntity entity = new StringEntity(json);
+
+    StringEntity entity = new StringEntity(queryText);
     httpPost.setEntity(entity);
     httpPost.setHeader("Accept", "application/json");
     httpPost.setHeader("Content-type", "application/json");
+    //执行查询
     CloseableHttpResponse response = client.execute(httpPost);
-    HttpEntity entity1 = response.getEntity();
-    String responseString = EntityUtils.toString(entity1, "UTF-8");
 
-    JSONArray jsonArray = new JSONArray(responseString);
-    String content = extractFieldFromJson_greater100uv(fileName, jsonArray);
-    CheckData.writeToCsv(content, fileName);
+    HttpEntity he = response.getEntity();
+    String result = EntityUtils.toString(he, "UTF-8");
+    return new JSONArray(result);
   }
+
 
   public static String extractFieldFromJson(String fileName, JSONArray jsonArray) {
     String content = "";
     if (!new File(fileName).exists()) {
-      content = "goods_id," + "clicks," + "impressions," + "ctr" + "\n";
-    }
-    for (int i = 0; i < jsonArray.length(); i++) {
-      JSONObject event = jsonArray.getJSONObject(i).getJSONObject("event");
-      content += event.getString("goods_id") + ","
-          + Optional.ofNullable(event.get("sum_clicks")).orElse(0) + ","
-          + Optional.ofNullable(event.get("sum_impressions")).orElse(0) + ","
-          + Optional.ofNullable(event.get("ctr")).orElse(0) + ","
-          + "\n";
-    }
-    return content;
-  }
-
-  public static String extractFieldFromJson_greater100uv(String fileName, @NotNull JSONArray jsonArray) {
-    String content = "";
-    if (!new File(fileName).exists()) {
       Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
-      while (keys.hasNext()){
-        content += keys.next() + ",";
+      while (keys.hasNext()) {
+        if (content.equals("")) {
+          content = keys.next();
+        } else {
+          content += "," + keys.next();
+        }
       }
       content += "\n";
     }
@@ -117,10 +137,15 @@ public class CheckDataJson {
     for (int i = 0; i < jsonArray.length(); i++) {
       JSONObject event = jsonArray.getJSONObject(i).getJSONObject("event");
       Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
-      while (keys.hasNext()){
-        content += Optional.ofNullable(event.get(keys.next())).orElse(0) + ",";
+      String line = "";
+      while (keys.hasNext()) {
+        if (line.equals("")) {
+          line = Optional.ofNullable(event.get(keys.next())).orElse(0) + ",";
+        } else {
+          line += "," + Optional.ofNullable(event.get(keys.next())).orElse(0) + ",";
+        }
       }
-      content += "\n";
+      content += line + "\n";
     }
     return content;
   }

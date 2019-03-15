@@ -1,19 +1,14 @@
 package sql;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
+
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -25,12 +20,11 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.json.CDL;
 import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
 
 
 public class CheckData {
 
-  public static void main(String[] args) throws IOException, InterruptedException {
+  public static void main(String[] args) throws IOException{
     //pullDataByUsers_id("d:\\sheet2.txt");
     //pullUsers();
     String startTime = "2019-01-05 00:00:00";
@@ -65,7 +59,7 @@ public class CheckData {
       return;
     }
     //System.out.println(content);
-    writeToCsv(content, fileName);
+
 
   }
 
@@ -77,20 +71,5 @@ public class CheckData {
     return csv;
   }
 
-  public static void writeToCsv(String content, String fileName) {
-    try {
-      File csv = new File(fileName);//CSV文件
-      BufferedWriter bw = new BufferedWriter(new FileWriter(csv, true));
-      bw.write(content);
-      bw.flush();
-      bw.close();
-    } catch (FileNotFoundException e) {
-      //捕获File对象生成时的异常
-      e.printStackTrace();
-    } catch (IOException e) {
-      //捕获BufferedWriter对象关闭时的异常
-      e.printStackTrace();
-    }
 
-  }
 }

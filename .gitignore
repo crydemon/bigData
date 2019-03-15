@@ -2,6 +2,7 @@
 .idea
 target
 src/main/resources
+output
 
 
 # Compiled class file
@@ -24,3 +25,4 @@ src/main/resources
 *.zip
 *.tar.gz
 *.rar
+*.csv
