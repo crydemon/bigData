@@ -1,11 +1,13 @@
 package sql;
 
+import com.sun.istack.internal.NotNull;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
@@ -28,7 +30,7 @@ public class CheckDataJson {
   }
 
   public static void pullData() throws IOException {
-    File file = new File("src/main/resources/druidQueryJson/4050_exposure_uv.json");
+    File file = new File("src/main/resources/druidQueryJson/ctr.json");
     final String content = FileUtils.readFileToString(file, "UTF-8");
     String fileName = "d:\\druidRecord.csv";
     writeToFileByJson(content, fileName);
@@ -102,19 +104,23 @@ public class CheckDataJson {
     return content;
   }
 
-  public static String extractFieldFromJson_greater100uv(String fileName, JSONArray jsonArray) {
+  public static String extractFieldFromJson_greater100uv(String fileName, @NotNull JSONArray jsonArray) {
     String content = "";
-    if(jsonArray.isEmpty()) return content;
     if (!new File(fileName).exists()) {
-      content = "goods_id," + "exposure_uv" + "exposure_pv" + "\n";
+      Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
+      while (keys.hasNext()){
+        content += keys.next() + ",";
+      }
+      content += "\n";
     }
-    jsonArray.getJSONObject(0).getJSONObject("event").keys();
+
     for (int i = 0; i < jsonArray.length(); i++) {
       JSONObject event = jsonArray.getJSONObject(i).getJSONObject("event");
-      content += Optional.ofNullable(event.get("page_goods_id")).orElse(0) + ","
-          + Optional.ofNullable(event.get("exposure_uv")).orElse(0) + ","
-          + Optional.ofNullable(event.get("exposure_pv")).orElse(0) + ","
-          + "\n";
+      Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
+      while (keys.hasNext()){
+        content += Optional.ofNullable(event.get(keys.next())).orElse(0) + ",";
+      }
+      content += "\n";
     }
     return content;
   }
