@@ -27,8 +27,8 @@ public class CheckDataJson {
   public static void main(String[] args) throws IOException {
     File d = new File("output/druid");
     d.mkdirs();
-    String queryFileName = "src/main/resources/druidQuery/ctr.json";
-    String outputFileName = "output/druid/ctr.csv";
+    String queryFileName = "src/main/resources/druidQuery/858.json";
+    String outputFileName = "output/druid/858.json.csv";
     String paramName = "";
     String paramFile = "";
     pullData(queryFileName, outputFileName, paramName, paramFile);
@@ -48,7 +48,12 @@ public class CheckDataJson {
         if (paramCount == 1000 && intParams.charAt(i) == ',') {
           String curQuery = queryText.replace(paramName, queryParams);
           JSONArray druidData = queryDruidByJson(curQuery);
-          String csvText = extractFieldFromJson(outputFileName, druidData);
+          String csvText;
+          if (queryText.contains("timeseries")) {
+            csvText = extractFieldFromJsonT(outputFileName, druidData);
+          } else {
+            csvText = extractFieldFromJsonG(outputFileName, druidData);
+          }
           writeToCsv(csvText, outputFileName);
           paramCount = 0;
         } else {
@@ -59,7 +64,13 @@ public class CheckDataJson {
 
     } else {
       JSONArray druidData = queryDruidByJson(queryText);
-      String csvText = extractFieldFromJson(outputFileName, druidData);
+      String csvText;
+      if (queryText.contains("timeseries")) {
+        csvText = extractFieldFromJsonT(outputFileName, druidData);
+      } else {
+        csvText = extractFieldFromJsonG(outputFileName, druidData);
+      }
+
       writeToCsv(csvText, outputFileName);
     }
   }
@@ -119,7 +130,7 @@ public class CheckDataJson {
   }
 
 
-  public static String extractFieldFromJson(String fileName, JSONArray jsonArray) {
+  public static String extractFieldFromJsonG(String fileName, JSONArray jsonArray) {
     String content = "";
     if (!new File(fileName).exists()) {
       Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
@@ -145,6 +156,21 @@ public class CheckDataJson {
         }
       }
       content += line + "\n";
+    }
+    return content;
+  }
+
+  public static String extractFieldFromJsonT(String fileName, JSONArray jsonArray) {
+    String content = "";
+    if (!new File(fileName).exists()) {
+      content = "date,uv\n";
+    }
+
+    for (int i = 0; i < jsonArray.length(); i++) {
+      JSONObject one = jsonArray.getJSONObject(i);
+      String date = one.getString("timestamp").substring(0, 10);
+      float uv = one.getJSONObject("result").getFloat("uv");
+      content += date + "," + Math.round(uv) + "\n";
     }
     return content;
   }

@@ -32,12 +32,6 @@ object SparkSql39042 extends App {
     .option("header", "true")
     .option("delimiter", ",")
     .csv("D:\\app_install_record.csv")
-    .show(10)
-  spark
-    .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\app_install_record.csv")
     .createOrReplaceTempView("app_install_record")
 
   spark
@@ -50,8 +44,8 @@ object SparkSql39042 extends App {
   spark.sql("" +
     " select to_date(ar.install_time) AS event_date, " +
     " ar.media_source, " +
-    " count(distinct ar.device_id) AS active_num, " +
-    " count(distinct air.device_id) AS push_num " +
+    " count(1) AS active_num, " +
+    " sum(if(air.push_result = 2, 1, 0)) AS push_num " +
     " from appsflyer_record ar " +
     " left join app_install_record air on ar.device_id = air.device_id  and datediff(air.push_time, ar.install_time) = 1 " +
     " group by event_date, media_source")
