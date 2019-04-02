@@ -1,8 +1,8 @@
 package sql
 
-import java.io.{File}
+import java.io.File
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import utils.{FileUtils, SQLService}
 
 object SparkSql39041 extends App {
@@ -56,4 +56,5 @@ object SparkSql39042 extends App {
     .option("delimiter", ",")
     .csv("d:\\result")
 }
+
 

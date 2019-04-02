@@ -27,8 +27,8 @@ public class CheckDataJson {
   public static void main(String[] args) throws IOException {
     File d = new File("output/druid");
     d.mkdirs();
-    String queryFileName = "src/main/resources/druidQuery/858.json";
-    String outputFileName = "output/druid/858.json.csv";
+    String queryFileName = "src/main/resources/druidQuery/905.json";
+    String outputFileName = "output/druid/905.csv";
     String paramName = "";
     String paramFile = "";
     pullData(queryFileName, outputFileName, paramName, paramFile);
@@ -50,9 +50,9 @@ public class CheckDataJson {
           JSONArray druidData = queryDruidByJson(curQuery);
           String csvText;
           if (queryText.contains("timeseries")) {
-            csvText = extractFieldFromJsonT(outputFileName, druidData);
+            csvText = extractFieldFromJson(outputFileName, druidData, "result");
           } else {
-            csvText = extractFieldFromJsonG(outputFileName, druidData);
+            csvText = extractFieldFromJson(outputFileName, druidData, "event");
           }
           writeToCsv(csvText, outputFileName);
           paramCount = 0;
@@ -66,9 +66,9 @@ public class CheckDataJson {
       JSONArray druidData = queryDruidByJson(queryText);
       String csvText;
       if (queryText.contains("timeseries")) {
-        csvText = extractFieldFromJsonT(outputFileName, druidData);
+        csvText = extractFieldFromJson(outputFileName, druidData, "result");
       } else {
-        csvText = extractFieldFromJsonG(outputFileName, druidData);
+        csvText = extractFieldFromJson(outputFileName, druidData, "event");
       }
 
       writeToCsv(csvText, outputFileName);
@@ -130,47 +130,24 @@ public class CheckDataJson {
   }
 
 
-  public static String extractFieldFromJsonG(String fileName, JSONArray jsonArray) {
-    String content = "";
+  public static String extractFieldFromJson(String fileName, JSONArray jsonArray, String queryResult) {
+    String content = "date";
     if (!new File(fileName).exists()) {
-      Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
+      Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject(queryResult).keys();
       while (keys.hasNext()) {
-        if (content.equals("")) {
-          content = keys.next();
-        } else {
-          content += "," + keys.next();
-        }
+        content += "," + keys.next();
       }
       content += "\n";
     }
 
     for (int i = 0; i < jsonArray.length(); i++) {
-      JSONObject event = jsonArray.getJSONObject(i).getJSONObject("event");
-      Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject("event").keys();
-      String line = "";
+      JSONObject event = jsonArray.getJSONObject(i).getJSONObject(queryResult);
+      Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject(queryResult).keys();
+      String line = jsonArray.getJSONObject(i).getString("timestamp").substring(0, 10);
       while (keys.hasNext()) {
-        if (line.equals("")) {
-          line = Optional.ofNullable(event.get(keys.next())).orElse(0) + ",";
-        } else {
-          line += "," + Optional.ofNullable(event.get(keys.next())).orElse(0) + ",";
-        }
+        line += "," +  Optional.ofNullable(event.get(keys.next())).orElse(0);
       }
       content += line + "\n";
-    }
-    return content;
-  }
-
-  public static String extractFieldFromJsonT(String fileName, JSONArray jsonArray) {
-    String content = "";
-    if (!new File(fileName).exists()) {
-      content = "date,uv\n";
-    }
-
-    for (int i = 0; i < jsonArray.length(); i++) {
-      JSONObject one = jsonArray.getJSONObject(i);
-      String date = one.getString("timestamp").substring(0, 10);
-      float uv = one.getJSONObject("result").getFloat("uv");
-      content += date + "," + Math.round(uv) + "\n";
     }
     return content;
   }
