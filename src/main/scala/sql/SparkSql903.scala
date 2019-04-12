@@ -128,7 +128,6 @@ object SparkSql903_3 extends App {
     .createOrReplaceTempView("order_info")
 
   spark
-  spark
     .sql(s"""
             | select *
             | from

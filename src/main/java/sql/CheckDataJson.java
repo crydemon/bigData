@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.Properties;
@@ -20,59 +21,78 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.junit.jupiter.api.Test;
 
 
 public class CheckDataJson {
 
+  @Test
+  public void test1() throws IOException {
+    final String queryText = FileUtils.readFileToString(new File("d:/devices.csv"), "UTF-8");
+    String[] strings = queryText.split("(\\r\\n)+");
+    for (String s : strings) {
+      System.out.println(s);
+    }
+  }
+
   public static void main(String[] args) throws IOException {
     File d = new File("output/druid");
     d.mkdirs();
-    String queryFileName = "src/main/resources/druidQuery/905.json";
-    String outputFileName = "output/druid/905.csv";
-    String paramName = "";
-    String paramFile = "";
-    pullData(queryFileName, outputFileName, paramName, paramFile);
+    String queryFileName = "src/main/resources/druidQuery/967.json";
+    String outputFileName = "d:/967.csv";
+    pullData(queryFileName, outputFileName);
   }
 
-  private static void pullData(String queryFileName, String outputFileName, String paramName,
-      String paramFile) throws IOException {
+  @Test
+  public void test2() throws IOException {
 
+    String queryFileName = "src/main/resources/druidQuery/967.json";
+    String outputFileName = "d:/967.csv";
+    String paramName = "777777777";
+    pullDataUseParam(queryFileName, outputFileName, paramName);
+  }
+
+
+  private static void pullDataUseParam(String queryFileName, String outputFileName,
+      String paramName) throws IOException {
+    FileUtils.deleteQuietly(new File("d:/967.csv"));
+    File file = new File(queryFileName);
+    final String queryJson = FileUtils.readFileToString(file, "UTF-8");
+    final String queryText = FileUtils.readFileToString(new File("d:/devices.csv"), "UTF-8");
+    String[] strings = queryText.split("(\\r\\n)+");
+
+    ArrayList<String> params = new ArrayList<>();
+    for (int i = 1; i < strings.length; i++) {
+      if (!strings[i].contains("\"")) {
+        String param = "\"" + strings[i] + "\"";
+        params.add(param);
+      }
+      if (i % 2000 == 0 || i == strings.length - 1) {
+        String curQuery = queryJson.replace(paramName, String.join(",", params));
+        System.out.println(curQuery);
+        JSONArray druidData = queryDruidByJson(curQuery);
+        extractFieldFromJson(outputFileName, druidData, "event");
+        //writeToCsv(csvText, outputFileName);
+        params = new ArrayList<>();
+      }
+    }
+  }
+
+  private static void pullData(String queryFileName, String outputFileName) throws IOException {
+    System.out.println("goods");
     File file = new File(queryFileName);
     final String queryText = FileUtils.readFileToString(file, "UTF-8");
 
-    if (!paramName.isEmpty()) {
-      String intParams = JoinIntParam(paramFile);
-      String queryParams = "";
-      int paramCount = 0;
-      for (int i = 0; i < intParams.length(); i++) {
-        if (paramCount == 1000 && intParams.charAt(i) == ',') {
-          String curQuery = queryText.replace(paramName, queryParams);
-          JSONArray druidData = queryDruidByJson(curQuery);
-          String csvText;
-          if (queryText.contains("timeseries")) {
-            csvText = extractFieldFromJson(outputFileName, druidData, "result");
-          } else {
-            csvText = extractFieldFromJson(outputFileName, druidData, "event");
-          }
-          writeToCsv(csvText, outputFileName);
-          paramCount = 0;
-        } else {
-          paramCount++;
-          queryParams += intParams.charAt(i);
-        }
-      }
-
-    } else {
-      JSONArray druidData = queryDruidByJson(queryText);
-      String csvText;
-      if (queryText.contains("timeseries")) {
-        csvText = extractFieldFromJson(outputFileName, druidData, "result");
-      } else {
-        csvText = extractFieldFromJson(outputFileName, druidData, "event");
-      }
-
-      writeToCsv(csvText, outputFileName);
+    JSONArray druidData = queryDruidByJson(queryText);
+    String csvText = "";
+    if (queryText.contains("timeseries")) {
+      System.out.println("timeSeries");
+      csvText = extractFieldFromJson(outputFileName, druidData, "result");
+    } else if (queryText.contains("groupBy")) {
+      System.out.println("groupBy");
+      csvText = extractFieldFromJson(outputFileName, druidData, "event");
     }
+    //writeToCsv(csvText, outputFileName);
   }
 
   private static void writeToCsv(String content, String fileName) {
@@ -89,6 +109,21 @@ public class CheckDataJson {
       //捕获BufferedWriter对象关闭时的异常
       e.printStackTrace();
     }
+  }
+
+  private static String JoinStringParam(String paramFile) {
+    String result = "";
+    try {
+      final String params = FileUtils.readFileToString(new File(paramFile), "UTF-8");
+      result = params.replaceAll("(\\r\\n)+", "','");
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      return result;
+    }
+
   }
 
 
@@ -130,7 +165,9 @@ public class CheckDataJson {
   }
 
 
-  public static String extractFieldFromJson(String fileName, JSONArray jsonArray, String queryResult) {
+  public static String extractFieldFromJson(String fileName, JSONArray jsonArray,
+      String queryResult)
+      throws IOException {
     String content = "date";
     if (!new File(fileName).exists()) {
       Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject(queryResult).keys();
@@ -139,16 +176,22 @@ public class CheckDataJson {
       }
       content += "\n";
     }
+    File csv = new File(fileName);//CSV文件
+    BufferedWriter bw = new BufferedWriter(new FileWriter(csv, true));
+    bw.write(content);
 
     for (int i = 0; i < jsonArray.length(); i++) {
       JSONObject event = jsonArray.getJSONObject(i).getJSONObject(queryResult);
       Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject(queryResult).keys();
-      String line = jsonArray.getJSONObject(i).getString("timestamp").substring(0, 10);
+      String line = jsonArray.getJSONObject(i).getString("timestamp");
       while (keys.hasNext()) {
-        line += "," +  Optional.ofNullable(event.get(keys.next())).orElse(0);
+        line += "," + Optional.ofNullable(event.get(keys.next())).orElse(0);
       }
-      content += line + "\n";
+      content = line + "\n";
+      bw.write(content);
     }
+    bw.flush();
+    bw.close();
     return content;
   }
 }
