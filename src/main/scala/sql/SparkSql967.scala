@@ -2,11 +2,12 @@ package sql
 
 import java.io.File
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SparkSession, functions}
 import utils.FileUtils
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import org.apache.spark.sql.functions.{collect_list, udf, lit}
+
+import org.apache.spark.sql.functions.{collect_list, lit, udf}
 
 
 object SparkSql967 extends App {
@@ -142,7 +143,6 @@ object SparkSql967_1 extends App {
     .master("local[*]")
     .getOrCreate()
 
-  import spark.implicits._
 
   spark
     .read
@@ -177,24 +177,31 @@ object SparkSql967_1 extends App {
     .option("header", "true")
     .option("delimiter", ",")
     .csv("D:\\login.csv")
+  import spark.implicits._
 
 
-  val dateStr = "2019-04-01"
+  val dateStr = "2019-03-31"
   val pattern = "yyyy-MM-dd"
   val fmt = new SimpleDateFormat(pattern)
   val calendar = Calendar.getInstance();
   calendar.setTime(fmt.parse(dateStr))
-  (0 to 9).foreach(i => {
+  (0 to 9).foreach(_ => {
 
 
-    calendar.add(Calendar.DATE, i)
+    calendar.add(Calendar.DATE, 1)
     val d = fmt.format(calendar.getTime)
     visits
-      .filter(s"date like '$d%'")
+      .withColumn("good_date", $"date".substr(0, 10))
+      .filter($"good_date" === d)
       .createOrReplaceTempView("visits")
+
+
+
+
     login
-      .filter(s"action_date = '$d'")
+      .filter($"action_date" === d)
       .createOrReplaceTempView("login")
+
 
     spark
       .sql(
@@ -207,7 +214,7 @@ object SparkSql967_1 extends App {
            | (select
            |   *,
            |  row_number()
-           |   over (partition by device_id order by date desc)
+           |   over (partition by device_id,page_code order by date desc)
            |     as rank
            | from visits
            | ) as tmp
@@ -222,10 +229,11 @@ object SparkSql967_1 extends App {
         s"""
            | select
            |  count(*) AS nums
-           | from tmp
+           | from login
     """.stripMargin)
       .first()
       .getLong(0)
+
 
     if (total > 0) {
       List("avg", "intervals", "freq") foreach (key => {
@@ -300,4 +308,45 @@ object SparkSql967_1 extends App {
         .csv(s"d:\\$d")
     }
   })
+}
+
+
+object SparkSql967_2 extends App {
+  FileUtils.dirDel(new File("D:/result"))
+
+
+  val spark = SparkSession
+    .builder()
+    .master("local[*]")
+    .getOrCreate()
+
+  import spark.implicits._
+
+
+  val visits = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\967.csv")
+    .withColumn("good_date", $"date".substr(0, 10))
+    .createOrReplaceTempView("druid")
+
+  val login = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\login.csv")
+    .createOrReplaceTempView("mysql")
+
+  spark
+    .sql(
+      s"""
+         | select
+         |  *
+         | from druid d
+         |  inner join mysql m on m.device_id = d.device_id and d.good_date = m.action_date
+    """.stripMargin)
+    .groupBy("action_date").agg(functions.count(lit(1))).show()
+
+
 }
