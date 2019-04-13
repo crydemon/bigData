@@ -177,6 +177,7 @@ object SparkSql967_1 extends App {
     .option("header", "true")
     .option("delimiter", ",")
     .csv("D:\\login.csv")
+
   import spark.implicits._
 
 
@@ -194,8 +195,6 @@ object SparkSql967_1 extends App {
       .withColumn("good_date", $"date".substr(0, 10))
       .filter($"good_date" === d)
       .createOrReplaceTempView("visits")
-
-
 
 
     login
@@ -228,8 +227,9 @@ object SparkSql967_1 extends App {
       .sql(
         s"""
            | select
-           |  count(*) AS nums
-           | from login
+           |  count(distinct l.device_id) AS nums
+           | from login l
+           |  inner join user_tag ug on ug.device_id = l.device_id
     """.stripMargin)
       .first()
       .getLong(0)
@@ -301,7 +301,6 @@ object SparkSql967_1 extends App {
              |  union all select * from tmp_freq
     """.stripMargin)
         .coalesce(1)
-        .coalesce(1)
         .write
         .option("header", "true")
         .option("delimiter", ",")
@@ -320,33 +319,79 @@ object SparkSql967_2 extends App {
     .master("local[*]")
     .getOrCreate()
 
-  import spark.implicits._
-
 
   val visits = spark
     .read
     .option("header", "true")
     .option("delimiter", ",")
-    .csv("D:\\967.csv")
-    .withColumn("good_date", $"date".substr(0, 10))
-    .createOrReplaceTempView("druid")
+    .csv("D:\\new_user_967.csv")
+
 
   val login = spark
     .read
     .option("header", "true")
     .option("delimiter", ",")
-    .csv("D:\\login.csv")
-    .createOrReplaceTempView("mysql")
+    .csv("D:\\new_user.csv")
 
-  spark
-    .sql(
-      s"""
-         | select
-         |  *
-         | from druid d
-         |  inner join mysql m on m.device_id = d.device_id and d.good_date = m.action_date
+  import spark.implicits._
+
+
+  val dateStr = "2019-03-31"
+  val pattern = "yyyy-MM-dd"
+  val fmt = new SimpleDateFormat(pattern)
+  val calendar = Calendar.getInstance()
+  calendar.setTime(fmt.parse(dateStr))
+  (0 to 9).foreach(_ => {
+
+    calendar.add(Calendar.DATE, 1)
+    val d = fmt.format(calendar.getTime)
+    visits
+      .withColumn("good_date", $"date".substr(0, 10))
+      .filter($"good_date" === d)
+      .createOrReplaceTempView("visits")
+
+    login
+      .filter($"action_date" === d)
+      .createOrReplaceTempView("login")
+
+
+    spark
+      .sql(
+        s"""
+           | select
+           |  device_id,
+           |  first(page_code) AS page_code
+           | from
+           | (select
+           |   *,
+           |  row_number()
+           |   over (partition by device_id order by date desc)
+           |     as rank
+           | from visits
+           | ) as tmp
+           |  inner join login using(device_id)
+           | where tmp.rank = 1
+           | group by device_id
     """.stripMargin)
-    .groupBy("action_date").agg(functions.count(lit(1))).show()
+      .createOrReplaceTempView("tmp")
 
+
+    spark
+      .sql(
+        s"""
+           | select
+           |  concat_ws('|',collect_set(page_code)) AS page_codes
+           | from tmp
+           | group by page_code
+           | order by count(1) desc
+           | limit 10
+    """.stripMargin)
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .option("delimiter", ",")
+      .csv(s"d:\\$d")
+
+  })
 
 }

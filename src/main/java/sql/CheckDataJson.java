@@ -47,18 +47,19 @@ public class CheckDataJson {
   public void test2() throws IOException {
 
     String queryFileName = "src/main/resources/druidQuery/967.json";
-    String outputFileName = "d:/967.csv";
+    String outputFileName = "d:/new_user_967.csv";
     String paramName = "777777777";
-    pullDataUseParam(queryFileName, outputFileName, paramName);
+    String paramFile = "d:/new_user_devices.csv";
+    pullDataUseParam(queryFileName, outputFileName, paramName, paramFile);
   }
 
 
   private static void pullDataUseParam(String queryFileName, String outputFileName,
-      String paramName) throws IOException {
-    FileUtils.deleteQuietly(new File("d:/967.csv"));
+      String paramName, String paramFile) throws IOException {
+    FileUtils.deleteQuietly(new File(outputFileName));
     File file = new File(queryFileName);
     final String queryJson = FileUtils.readFileToString(file, "UTF-8");
-    final String queryText = FileUtils.readFileToString(new File("d:/devices.csv"), "UTF-8");
+    final String queryText = FileUtils.readFileToString(new File(paramFile), "UTF-8");
     String[] strings = queryText.split("(\\r\\n)+");
 
     ArrayList<String> params = new ArrayList<>();
@@ -67,9 +68,10 @@ public class CheckDataJson {
         String param = "\"" + strings[i] + "\"";
         params.add(param);
       }
-      if (i % 2000 == 0 || i == strings.length - 1) {
+      if (i % 5000 == 0 || i == strings.length - 1) {
+        System.out.println(i);
         String curQuery = queryJson.replace(paramName, String.join(",", params));
-        System.out.println(curQuery);
+        //System.out.println(curQuery);
         JSONArray druidData = queryDruidByJson(curQuery);
         extractFieldFromJson(outputFileName, druidData, "event");
         //writeToCsv(csvText, outputFileName);
