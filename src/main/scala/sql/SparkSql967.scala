@@ -183,7 +183,7 @@ object SparkSql967_1 extends App {
   val dateStr = "2019-03-31"
   val pattern = "yyyy-MM-dd"
   val fmt = new SimpleDateFormat(pattern)
-  val calendar = Calendar.getInstance();
+  val calendar = Calendar.getInstance()
   calendar.setTime(fmt.parse(dateStr))
   (0 to 9).foreach(_ => {
 
@@ -214,7 +214,7 @@ object SparkSql967_1 extends App {
            | (select
            |   *,
            |  row_number()
-           |   over (partition by device_id,page_code order by date desc)
+           |   over (partition by device_id order by date desc)
            |     as rank
            | from visits
            | ) as tmp
