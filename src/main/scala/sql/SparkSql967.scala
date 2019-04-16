@@ -7,7 +7,7 @@ import utils.FileUtils
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
-import org.apache.spark.sql.functions.{collect_list, lit, udf}
+
 
 
 object SparkSql967 extends App {
