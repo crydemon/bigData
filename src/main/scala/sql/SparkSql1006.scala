@@ -20,6 +20,13 @@ object SparkSql1006 extends App {
     .read
     .option("header", "true")
     .option("delimiter", ",")
+    .csv("D:\\login.csv")
+    .createOrReplaceTempView("login")
+
+  spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
     .csv("D:\\order_info.csv")
     .createOrReplaceTempView("order_info")
 
@@ -116,10 +123,10 @@ object SparkSql1006 extends App {
       s"""
          | select
          |   *
-         | from order_info
-         |   inner join consume using (device_id)
-         |   inner join activity using (device_id)
-         |   inner join frequent using (device_id)
+         | from login
+         |   left join consume using (device_id)
+         |   left join activity using (device_id)
+         |   left join frequent using (device_id)
           """.stripMargin)
     .coalesce(1)
     .write
@@ -131,7 +138,6 @@ object SparkSql1006 extends App {
 }
 
 object SparkSql1006_4 extends App {
-  FileUtils.dirDel(new File("D:/result"))
 
 
   val spark = SparkSession
@@ -144,69 +150,77 @@ object SparkSql1006_4 extends App {
     .option("header", "true")
     .option("delimiter", ",")
     .csv("D:\\device_tags.csv")
-    .createOrReplaceTempView("device_tags")
-
-
-
-  spark
-    .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\users.csv")
-    .createOrReplaceTempView("users")
-
-  spark
-    .sql(
-      s"""
-         | select
-         |  dt.device_id,
-         |  first(dt.avg) AS avg,
-         |  first(dt.intervals) AS intervals,
-         |  first(dt.freq) AS freq
-         | from
-         |  device_tags dt
-         | group by dt.device_id
-    """.stripMargin)
-    .createOrReplaceTempView("tmp2")
-
+    .createOrReplaceTempView("tmp")
 
   val tmp = spark
     .sql(
       s"""
          | select
-         |  dt.*,
-         |  u.*
+         |  tmp.*
          | from
-         |  tmp2 dt
-         |  inner join users u using(device_id)
-         |  inner join users u1 using(device_id)
-         | where datediff(to_date(u1.action_date), to_date(u.action_date)) = 1
-    """.stripMargin)
-    // .createOrReplaceTempView("tmp")
+         |  tmp
+         |  inner join tmp tmp1 using(device_id)
+         | where datediff(to_date(tmp1.action_date), to_date(tmp.action_date)) = 1
+      """.stripMargin)
 
   //视图
   List("avg", "intervals", "freq") foreach (key => {
+    FileUtils.dirDel(new File(s"d:/$key"))
     tmp
       .groupBy("action_date")
       .pivot(s"$key")
       .count()
-      .createOrReplaceTempView(s"tmp_${key}")
-
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .option("delimiter", ",")
+      .csv(s"d:/{$key}_next_day")
   })
+
+
+}
+
+
+object SparkSql1006_5 extends App {
+
+  FileUtils.dirDel(new File("d:/last_click_list_type"))
+
+  val spark = SparkSession
+    .builder()
+    .master("local[*]")
+    .getOrCreate()
+
   spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\order_cause.csv")
+    .createOrReplaceTempView("order_cause")
+
+  spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\order_info.csv")
+    .createOrReplaceTempView("order_info")
+
+  val tmp = spark
     .sql(
       s"""
          | select
-         |  *
-         | from tmp_avg
-         |  inner join tmp_intervals using(action_date)
-         |  inner join tmp_freq using(action_date)
-    """.stripMargin)
+         |  to_date(oi.order_time) as order_date,
+         |  last_click_list_type,
+         |  pay_status,
+         |  count(1)
+         | from order_info oi
+         |  inner join order_cause oc on oc.order_goods_rec_id = oi.rec_id
+         |  group by order_date, last_click_list_type,pay_status
+      """.stripMargin)
     .coalesce(1)
     .write
     .option("header", "true")
     .option("delimiter", ",")
-    .csv("d:/result")
+    .csv("d:/last_click_list_type")
+
 
 }
-
