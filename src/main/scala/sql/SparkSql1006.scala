@@ -1,7 +1,7 @@
 package sql
 
-import java.io.File
-
+import java.io.{File, FileInputStream}
+import java.util.Properties
 
 import org.apache.spark.sql.functions
 import org.apache.spark.sql.SparkSession
@@ -14,21 +14,56 @@ object SparkSql1006 extends App {
     .master("local[*]")
     .getOrCreate()
 
-  import spark.implicits._
+
+
+  val prop = new Properties()
+  val file = new File("src/main/resources/mysql")
+  val in = new FileInputStream(file)
+  prop.load(in)
+  val url = prop.getProperty("url")
+
+  val loginSql =
+    s"""
+       | (SELECT
+       |   device_id,
+       |   action_date
+       | FROM temp_country_device_cohort_details tcdcd
+       | WHERE action_date >= '2019-04-15'
+       |       AND action_date < '2019-04-20'
+       |  ) AS tmp
+          """.stripMargin
 
   spark
     .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\login.csv")
+    .jdbc(url, loginSql, prop)
     .createOrReplaceTempView("login")
 
+  val orderInfoSql =
+    s"""
+       | (
+       |   SELECT
+       |    oi.device_id,
+       |    oi.order_id,
+       |    oi.order_time,
+       |    oi.shipping_fee,
+       |    oi.goods_amount,
+       |    oi.bonus,
+       |    oi.order_amount,
+       |    oi.pay_time
+       |  FROM (
+       |         SELECT DISTINCT tcdcd.device_id
+       |         FROM temp_country_device_cohort_details tcdcd
+       |         WHERE tcdcd.action_date >= '2019-04-15') AS tmp
+       |    INNER JOIN order_info oi ON tmp.device_id = oi.device_id
+       |                                AND oi.pay_status IN (1, 2)
+       |                                AND oi.email NOT LIKE '%@tetx.com'
+       |  ) AS tmp
+          """.stripMargin
+
   spark
     .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\order_info.csv")
-    .createOrReplaceTempView("order_info")
+    .jdbc(url, loginSql, prop)
+    .createOrReplaceTempView("login")
 
   val avg = 16.720800495990105
   spark
@@ -85,6 +120,7 @@ object SparkSql1006 extends App {
       s"""
          | select
          |   case
+         |     when s.pay_time is null then 'only ordered once'
          |     when datediff(to_date(f.pay_time), to_date(s.pay_time)) <= 15 then '0-15'
          |     when datediff(to_date(f.pay_time), to_date(s.pay_time)) <= 30 then '15-30'
          |     when datediff(to_date(f.pay_time), to_date(s.pay_time)) <= 45 then '30-45'
@@ -93,7 +129,7 @@ object SparkSql1006 extends App {
          |  end as intervals,
          |  f.device_id
          | from first f
-         |   inner join second s using(device_id)
+         |   left join second s using(device_id)
     """.stripMargin)
     .createOrReplaceTempView("activity")
 
@@ -118,7 +154,7 @@ object SparkSql1006 extends App {
     .createOrReplaceTempView("frequent")
 
 
-  spark
+  val device_tag = spark
     .sql(
       s"""
          | select
@@ -128,11 +164,49 @@ object SparkSql1006 extends App {
          |   left join activity using (device_id)
          |   left join frequent using (device_id)
           """.stripMargin)
-    .coalesce(1)
-    .write
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("d:\\result")
+
+
+  //视图
+  List("avg", "intervals", "freq") foreach (key => {
+    FileUtils.dirDel(new File(s"d:/$key"))
+    device_tag
+      .groupBy("action_date")
+      .pivot(s"$key")
+      .count()
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .option("delimiter", ",")
+      .csv(s"d:/$key")
+  })
+
+
+  device_tag.createOrReplaceTempView("tmp")
+
+  val tmp = spark
+    .sql(
+      s"""
+         | select
+         |  tmp.*
+         | from
+         |  tmp
+         |  inner join tmp tmp1 using(device_id)
+         | where datediff(to_date(tmp1.action_date), to_date(tmp.action_date)) = 1
+      """.stripMargin)
+
+  //视图
+  List("avg", "intervals", "freq") foreach (key => {
+    FileUtils.dirDel(new File(s"d:/$key" + "_next_day"))
+    tmp
+      .groupBy("action_date")
+      .pivot(s"$key")
+      .count()
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .option("delimiter", ",")
+      .csv(s"d:/$key" + "_next_day")
+  })
 
 
 }
@@ -211,9 +285,11 @@ object SparkSql1006_5 extends App {
          |  to_date(oi.order_time) as order_date,
          |  last_click_list_type,
          |  pay_status,
+         |  first(oi.user_id) as user_id
          |  count(1)
          | from order_info oi
          |  inner join order_cause oc on oc.order_goods_rec_id = oi.rec_id
+         | where virtual_goods_id IN(7470721,7933041,6662967,8130590,7303124,7367251,7419699,7792377,7905515,8153360,5489099,7470311,5327351,5294164,8173631,5524538,4351394,7216360,8560696,7343476)
          |  group by order_date, last_click_list_type,pay_status
       """.stripMargin)
     .coalesce(1)
@@ -222,5 +298,56 @@ object SparkSql1006_5 extends App {
     .option("delimiter", ",")
     .csv("d:/last_click_list_type")
 
+
+}
+
+
+object SparkSql1022 extends App {
+
+  FileUtils.dirDel(new File("d:/result"))
+
+  val spark = SparkSession
+    .builder()
+    .master("local[*]")
+    .getOrCreate()
+
+  val orders = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\orders.csv")
+
+
+  orders.createOrReplaceTempView("orders")
+
+  val dau = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\dau.csv")
+    .withColumnRenamed("count(DISTINCT device_id)", "dau")
+    .withColumnRenamed("date(su.event_time)", "event_date")
+    .withColumnRenamed("country", "country_code")
+
+  dau.createOrReplaceTempView("daus")
+
+  orders.show()
+  dau.show()
+
+  spark
+    .sql(
+      s"""
+         | select
+         |  d.event_date,
+         |  d.country_code,
+         |  concat(round(payed_num * 100.0/dau, 2), '%') AS CR
+         | from daus d
+         |  inner join orders o on d.event_date = o.event_date and d.country_code = o.country_code
+      """.stripMargin)
+    .coalesce(1)
+    .write
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("d:/result")
 
 }
