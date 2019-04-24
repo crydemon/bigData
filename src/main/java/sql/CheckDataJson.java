@@ -80,6 +80,14 @@ public class CheckDataJson {
     }
   }
 
+  @Test
+  public void test3() throws IOException {
+
+    String queryFileName = "src/main/resources/druidQuery/tmp.json";
+    String outputFileName = "d:/uv.csv";
+    pullData(queryFileName, outputFileName);
+  }
+
   private static void pullData(String queryFileName, String outputFileName) throws IOException {
     System.out.println("goods");
     File file = new File(queryFileName);

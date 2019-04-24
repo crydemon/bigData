@@ -334,8 +334,7 @@ class RunRecommender(private val spark: SparkSession) {
     // Join positive predictions to negative predictions by user, only.
     // This will result in a row for every possible pairing of positive and negative
     // predictions within each user.
-    positivePredictions.show(100)
-    negativePredictions.show(100)
+    //总共有MxN个正负样本对（N为负样本个数）
     val joinedPredictions = positivePredictions.join(negativePredictions, "user").
       select("user", "positivePrediction", "negativePrediction").cache()
 
