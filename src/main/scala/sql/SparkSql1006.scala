@@ -1,6 +1,6 @@
 package sql
 
-import java.io.{File, FileInputStream}
+import java.io.{File, FileInputStream, FileWriter}
 import java.text.SimpleDateFormat
 import java.util.{Calendar, Properties}
 
@@ -353,7 +353,7 @@ object SparkSql1022 extends App {
 }
 
 
-object SparkSql_tmp1 extends App {
+object SparkSql_search_report extends App {
 
   FileUtils.dirDel(new File("d:/result"))
 
@@ -483,11 +483,7 @@ object SparkSql_tmp1 extends App {
          |  inner join uv_data u using(pay_date)
          | order by pay_date desc
     """.stripMargin)
-    .coalesce(1)
-    .write
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("d:/result")
+    .show(truncate = false)
 }
 
 
@@ -515,41 +511,111 @@ object SparkSql_tmp2 extends App {
     .option("delimiter", ",")
     .csv("D:\\login.csv")
 
+
   calendar.setTime(fmt.parse("2019-01-01"))
   val endDate = fmt.parse("2019-04-22")
+
+
+  var output = "date,dau\n"
   while (calendar.getTime.compareTo(endDate) <= 0) {
     val beginDate = fmt.format(calendar.getTime)
-    val login = data
-      .filter(functions.to_date($"event_time") === beginDate)
+    val count = data
+      .filter(functions.to_date($"event_time") === beginDate and(functions.hour($"event_time") <= 11))
       .withColumn("event_date", functions.to_date($"event_time"))
-      .groupBy("device_id").agg(functions.approx_count_distinct("device_id").alias("dau"))
-    if (beginDate == "2019-01-01") {
-      login.createOrReplaceTempView("result")
-    } else {
-      login.createOrReplaceTempView("tmp")
-      spark.sql(
-        """
-          | select *
-          |   from result
-          |     union all select * from tmp
-        """.stripMargin).createOrReplaceTempView("result")
-    }
-
-    if (beginDate == "2019-04-22") {
-      spark.sql(
-        """
-          | select *
-          |   from result
-        """.stripMargin)
-        .coalesce(1)
-        .write
-        .option("header", "true")
-        .option("delimiter", ",")
-        .csv("d:/result")
-    }
+      .select("device_id")
+      .distinct()
+      .count()
+    output += beginDate + "," + count + "\n"
+    println(output)
     calendar.add(Calendar.DATE, 1)
   }
+  println(output)
+  val outFile = new FileWriter("d:/dau_12.csv", false)
+  outFile.write(output)
+  outFile.close()
 
+  calendar.setTime(fmt.parse("2019-01-01"))
+  var output1 = "date,dau\n"
+  while (calendar.getTime.compareTo(endDate) <= 0) {
+    val beginDate = fmt.format(calendar.getTime)
+    val count = data
+      .filter(functions.to_date($"event_time") === beginDate and($"country" === "FR"))
+      .withColumn("event_date", functions.to_date($"event_time"))
+      .select("device_id")
+      .distinct()
+      .count()
+    output1 += beginDate + "," + count + "\n"
+    calendar.add(Calendar.DATE, 1)
+  }
+  println(output1)
+  val outFile1 = new FileWriter("d:/dau_fr.csv", false)
+  outFile1.write(output1)
+  outFile1.close()
+
+  calendar.setTime(fmt.parse("2019-01-01"))
+  var output2 = "date,dau\n"
+  while (calendar.getTime.compareTo(endDate) <= 0) {
+    val beginDate = fmt.format(calendar.getTime)
+    val count = data
+      .filter(functions.to_date($"event_time") === beginDate and($"country" === "FR") and(functions.hour($"event_time") <= 11))
+      .withColumn("event_date", functions.to_date($"event_time"))
+      .select("device_id")
+      .distinct()
+      .count()
+    output2 += beginDate + "," + count + "\n"
+
+    calendar.add(Calendar.DATE, 1)
+  }
+  println(output2)
+  val outFile2 = new FileWriter("d:/dau_fr_12.csv", false)
+  outFile2.write(output2)
+  outFile2.close()
 }
 
+
+object SparkSql_search extends App {
+
+  FileUtils.dirDel(new File("d:/result1"))
+
+
+  val spark = SparkSession
+    .builder()
+    .master("local[*]")
+    .getOrCreate()
+
+  spark.sparkContext.setLogLevel("WARN")
+
+  import spark.implicits._
+
+  val pattern = "yyyy-MM-dd"
+  val fmt = new SimpleDateFormat(pattern)
+  val calendar = Calendar.getInstance()
+
+  val payed = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\payed.csv")
+
+
+  val uv = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\uv.csv")
+    .withColumn("event_date", $"date".substr(0, 10))
+
+  payed
+    .join(uv, $"pay_date" === $"event_date" and ($"region_code" === $"country"))
+    .withColumn("rate", $"payed_order" / $"uv")
+    .groupBy("event_date")
+    .pivot("country")
+    .agg(functions.first("rate"))
+    .coalesce(1)
+    .write
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("d:/result1")
+
+}
 

@@ -83,7 +83,7 @@ public class CheckDataJson {
   @Test
   public void test3() throws IOException {
 
-    String queryFileName = "src/main/resources/druidQuery/tmp.json";
+    String queryFileName = "src/main/resources/druidQuery/search.json";
     String outputFileName = "d:/uv.csv";
     pullData(queryFileName, outputFileName);
   }
@@ -94,15 +94,13 @@ public class CheckDataJson {
     final String queryText = FileUtils.readFileToString(file, "UTF-8");
 
     JSONArray druidData = queryDruidByJson(queryText);
-    String csvText = "";
     if (queryText.contains("timeseries")) {
       System.out.println("timeSeries");
-      csvText = extractFieldFromJson(outputFileName, druidData, "result");
+      extractFieldFromJson(outputFileName, druidData, "result");
     } else if (queryText.contains("groupBy")) {
       System.out.println("groupBy");
-      csvText = extractFieldFromJson(outputFileName, druidData, "event");
+      extractFieldFromJson(outputFileName, druidData, "event");
     }
-    //writeToCsv(csvText, outputFileName);
   }
 
   private static void writeToCsv(String content, String fileName) {
