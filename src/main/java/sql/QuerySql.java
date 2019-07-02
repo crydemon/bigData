@@ -55,4 +55,17 @@ public class QuerySql {
         + "group by hour(__time)";
     return sql;
   }
+  public static String searchCTR(String startTime, String endTime) {
+    String sql = "SELECT\n"
+        + " floor(__time to day) AS cur_day,\n"
+        + " sum(impressions) AS sum_impressions,\n"
+        + " sum(clicks) AS sum_clicks,\n"
+        + " count(DISTINCT domain_userid) AS uv,\n"
+        + " sum(clicks) * 1.0/sum(impressions) AS rate\n"
+        + "FROM goods_ctr_v2\n"
+        + "WHERE  page_code = 'search_result'\n"
+        + "    AND __time >= TIMESTAMP '" + startTime + "'\n"
+        + "group BY floor(__time to day)";
+    return sql;
+  }
 }

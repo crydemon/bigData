@@ -353,140 +353,6 @@ object SparkSql1022 extends App {
 }
 
 
-object SparkSql_search_report extends App {
-
-  FileUtils.dirDel(new File("d:/result"))
-
-
-  val spark = SparkSession
-    .builder()
-    .master("local[*]")
-    .getOrCreate()
-
-  spark.sparkContext.setLogLevel("ERROR")
-
-  import spark.implicits._
-
-
-  spark
-    .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\uv.csv")
-    .withColumn("pay_date", $"date".substr(0, 10))
-    .createOrReplaceTempView("uv_data")
-
-
-  val order_goods = spark
-    .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\order_goods.csv")
-    .filter("sku_pay_status >= 1 and parent_rec_id = 0")
-    .withColumn("pay_date", $"pay_time".substr(0, 10))
-
-  val order_cause = spark
-    .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\order_cause.csv")
-    .filter("last_click_list_type is not null and trim(last_click_list_type) != '' ")
-    .withColumnRenamed("order_goods_rec_id", "rec_id")
-    .withColumnRenamed("user_id", "user_id_1")
-
-  order_cause.createOrReplaceTempView("order_cause")
-
-  order_goods
-    .createOrReplaceTempView("order_goods")
-
-  spark
-    .sql(
-      s"""
-         | select
-         |  pay_date,
-         |  goods_sn,
-         |  sum(price) AS goods_sn_gmv
-         | from order_goods og
-         | group by pay_date, goods_sn
-    """.stripMargin)
-    .createOrReplaceTempView("goods_sn_info")
-
-  spark
-    .sql(
-      s"""
-         | select *
-         | from
-         | (select
-         |   *,
-         |  row_number()
-         |   over (partition by pay_date order by goods_sn_gmv desc)
-         |     as rank
-         | from goods_sn_info
-         | ) as tmp
-         | where tmp.rank <= 500
-    """.stripMargin)
-    .createOrReplaceTempView("tmp")
-
-
-  spark
-    .sql(
-      s"""
-         | select
-         |  *
-         | from order_goods og
-         |  inner join order_cause oc using(rec_id)
-    """.stripMargin)
-    .createOrReplaceTempView("order_info")
-
-
-  spark
-    .sql(
-      s"""
-         | select
-         |  pay_date,
-         |  sum(order_goods_gmv) AS top_500_gmv
-         | from order_info oi
-         |  where oi.last_click_list_type = '/search_result'
-         |    and exists (select * from tmp where tmp.goods_sn = oi.goods_sn and tmp.pay_date = oi.pay_date)
-         | group by pay_date
-    """.stripMargin)
-    .createOrReplaceTempView("top_500")
-
-
-  spark
-    .sql(
-      s"""
-         | select
-         |  oi.pay_date,
-         |  round(sum(if(oi.last_click_list_type = '/search_result', oi.order_goods_gmv, 0)), 2) AS search_app_gmv,
-         |  round(sum(oi.order_goods_gmv), 2) AS app_gmv,
-         |  concat(round(sum(if(oi.last_click_list_type = '/search_result', oi.order_goods_gmv, 0)) * 100.0/ sum(oi.order_goods_gmv), 2), '%') AS search_rate
-         | from order_info oi
-         | group by pay_date
-      """.stripMargin)
-    .createOrReplaceTempView("all_gmv")
-
-
-  spark
-    .sql(
-      s"""
-         | select
-         |  t.pay_date,
-         |  a.*,
-         |  u.uv,
-         |  u.pv,
-         |  round(search_app_gmv/ uv, 2) AS gmv_div_dau,
-         |  round(top_500_gmv, 2) AS top_500_gmv,
-         |  concat(round(top_500_gmv * 100.0 / app_gmv, 2), '%') AS top_500_rate
-         | from top_500 t
-         |  inner join all_gmv a using(pay_date)
-         |  inner join uv_data u using(pay_date)
-         | order by pay_date desc
-    """.stripMargin)
-    .show(truncate = false)
-}
-
-
 object SparkSql_tmp2 extends App {
 
   FileUtils.dirDel(new File("d:/result"))
@@ -520,7 +386,7 @@ object SparkSql_tmp2 extends App {
   while (calendar.getTime.compareTo(endDate) <= 0) {
     val beginDate = fmt.format(calendar.getTime)
     val count = data
-      .filter(functions.to_date($"event_time") === beginDate and(functions.hour($"event_time") <= 11))
+      .filter(functions.to_date($"event_time") === beginDate and (functions.hour($"event_time") <= 11))
       .withColumn("event_date", functions.to_date($"event_time"))
       .select("device_id")
       .distinct()
@@ -539,7 +405,7 @@ object SparkSql_tmp2 extends App {
   while (calendar.getTime.compareTo(endDate) <= 0) {
     val beginDate = fmt.format(calendar.getTime)
     val count = data
-      .filter(functions.to_date($"event_time") === beginDate and($"country" === "FR"))
+      .filter(functions.to_date($"event_time") === beginDate and ($"country" === "FR"))
       .withColumn("event_date", functions.to_date($"event_time"))
       .select("device_id")
       .distinct()
@@ -557,7 +423,7 @@ object SparkSql_tmp2 extends App {
   while (calendar.getTime.compareTo(endDate) <= 0) {
     val beginDate = fmt.format(calendar.getTime)
     val count = data
-      .filter(functions.to_date($"event_time") === beginDate and($"country" === "FR") and(functions.hour($"event_time") <= 11))
+      .filter(functions.to_date($"event_time") === beginDate and ($"country" === "FR") and (functions.hour($"event_time") <= 11))
       .withColumn("event_date", functions.to_date($"event_time"))
       .select("device_id")
       .distinct()
@@ -585,37 +451,67 @@ object SparkSql_search extends App {
 
   spark.sparkContext.setLogLevel("WARN")
 
-  import spark.implicits._
-
-  val pattern = "yyyy-MM-dd"
-  val fmt = new SimpleDateFormat(pattern)
   val calendar = Calendar.getInstance()
-
-  val payed = spark
-    .read
-    .option("header", "true")
-    .option("delimiter", ",")
-    .csv("D:\\payed.csv")
-
+  val now = calendar.getTimeInMillis / 1000
 
   val uv = spark
     .read
     .option("header", "true")
     .option("delimiter", ",")
     .csv("D:\\uv.csv")
-    .withColumn("event_date", $"date".substr(0, 10))
 
-  payed
-    .join(uv, $"pay_date" === $"event_date" and ($"region_code" === $"country"))
-    .withColumn("rate", $"payed_order" / $"uv")
+  uv.persist()
+
+
+  println(uv.schema.map(f=>f.name))
+  println(calendar.getTimeInMillis / 1000 - now)
+
+}
+
+object SparkSql_device_tag extends App {
+
+  FileUtils.dirDel(new File("d:/result1"))
+
+
+  val spark = SparkSession
+    .builder()
+    .master("local[*]")
+    .getOrCreate()
+
+  import spark.implicits._
+
+  spark.sparkContext.setLogLevel("WARN")
+
+
+  val users = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\users.csv")
+
+  val payments = spark
+    .read
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv("D:\\payments.csv")
+  users
+    .withColumn("event_date", $"date".substr(0, 10))
     .groupBy("event_date")
-    .pivot("country")
-    .agg(functions.first("rate"))
+    .count()
+    .show(40, truncate = false)
+
+  users
+      .select("user_unique_id")
+    .distinct()
+    .join(payments, $"user_id" === $"user_unique_id", "left")
+    .groupBy($"page_code", $"media_source")
+    .count()
     .coalesce(1)
     .write
     .option("header", "true")
     .option("delimiter", ",")
-    .csv("d:/result1")
+    .csv("D:\\result1")
+
 
 }
 

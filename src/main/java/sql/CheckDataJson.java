@@ -7,7 +7,11 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.Properties;
@@ -38,19 +42,50 @@ public class CheckDataJson {
   public static void main(String[] args) throws IOException {
     File d = new File("output/druid");
     d.mkdirs();
-    String queryFileName = "src/main/resources/druidQuery/967.json";
-    String outputFileName = "d:/967.csv";
+    String queryFileName = "src/main/resources/druidQuery/1142.json";
+    String outputFileName = "d:/flash_sale.csv";
     pullData(queryFileName, outputFileName);
   }
 
   @Test
   public void test2() throws IOException {
 
-    String queryFileName = "src/main/resources/druidQuery/967.json";
-    String outputFileName = "d:/new_user_967.csv";
+    String queryFileName = "src/main/resources/druidQuery/1111.json";
+    String outputFileName = "d:/app_start.csv";
     String paramName = "777777777";
     String paramFile = "d:/new_user_devices.csv";
     pullDataUseParam(queryFileName, outputFileName, paramName, paramFile);
+  }
+
+  @Test
+  public void test4() throws IOException, ParseException {
+
+    String queryFileName = "src/main/resources/druidQuery/1142.json";
+    String outputFileName = "d:/flash_sale.csv";
+    pullDataUseStartEnd(queryFileName, outputFileName);
+  }
+
+  private static void pullDataUseStartEnd(String queryFileName, String outputFileName)
+      throws IOException, ParseException {
+    File file = new File(queryFileName);
+    final String queryJson = FileUtils.readFileToString(file, "UTF-8");
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+    String start = "2019-06-28";
+    Date dt = sdf.parse(start);
+    Calendar rightNow = Calendar.getInstance();
+    rightNow.setTime(dt);
+    rightNow.add(Calendar.DATE, +1);
+    String end = sdf.format(rightNow.getTime());
+    while (end.compareTo("2019-06-29") <= 0) {
+      String queryText = queryJson.replace("start/end", start + "/" + end);
+
+      JSONArray druidData = queryDruidByJson(queryText);
+      System.out.println(queryText);
+      extractFieldFromJson(outputFileName, druidData, "event");
+      start = end;
+      rightNow.add(Calendar.DATE, +1);
+      end = sdf.format(rightNow.getTime());
+    }
   }
 
 
@@ -83,8 +118,8 @@ public class CheckDataJson {
   @Test
   public void test3() throws IOException {
 
-    String queryFileName = "src/main/resources/druidQuery/search.json";
-    String outputFileName = "d:/uv.csv";
+    String queryFileName = "src/main/resources/druidQuery/4368.json";
+    String outputFileName = "d:/web_mob_total.csv";
     pullData(queryFileName, outputFileName);
   }
 
@@ -103,21 +138,6 @@ public class CheckDataJson {
     }
   }
 
-  private static void writeToCsv(String content, String fileName) {
-    try {
-      File csv = new File(fileName);//CSV文件
-      BufferedWriter bw = new BufferedWriter(new FileWriter(csv, true));
-      bw.write(content);
-      bw.flush();
-      bw.close();
-    } catch (FileNotFoundException e) {
-      //捕获File对象生成时的异常
-      e.printStackTrace();
-    } catch (IOException e) {
-      //捕获BufferedWriter对象关闭时的异常
-      e.printStackTrace();
-    }
-  }
 
   private static String JoinStringParam(String paramFile) {
     String result = "";
@@ -173,16 +193,17 @@ public class CheckDataJson {
   }
 
 
-  public static String extractFieldFromJson(String fileName, JSONArray jsonArray,
-      String queryResult)
-      throws IOException {
-    String content = "date";
+  public static void extractFieldFromJson(String fileName, JSONArray jsonArray, String queryResult) throws IOException {
+    if(jsonArray.isEmpty()) return;
+    String content = "event_date";
     if (!new File(fileName).exists()) {
       Iterator<String> keys = jsonArray.getJSONObject(0).getJSONObject(queryResult).keys();
       while (keys.hasNext()) {
         content += "," + keys.next();
       }
       content += "\n";
+    } else {
+      content = "";
     }
     File csv = new File(fileName);//CSV文件
     BufferedWriter bw = new BufferedWriter(new FileWriter(csv, true));
@@ -200,6 +221,5 @@ public class CheckDataJson {
     }
     bw.flush();
     bw.close();
-    return content;
   }
 }

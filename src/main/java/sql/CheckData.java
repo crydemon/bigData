@@ -1,9 +1,12 @@
 package sql;
 
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -27,9 +30,9 @@ public class CheckData {
   public static void main(String[] args) throws IOException{
     //pullDataByUsers_id("d:\\sheet2.txt");
     //pullUsers();
-    String startTime = "2019-01-05 00:00:00";
-    String endTime = "2019-01-07 00:00:00";
-    writeToFile(QuerySql.getUsers(startTime, endTime), "d:\\hit_login.csv");
+    String startTime = "2019-05-01 00:00:00";
+    String endTime = "2019-05-05 00:00:00";
+    writeToFile(QuerySql.searchCTR(startTime, endTime), "d:\\search_ctr.csv");
   }
 
 
@@ -39,7 +42,7 @@ public class CheckData {
     File file= new File("src/main/resources/druid");
     InputStream in = new FileInputStream(file);
     properties.load(in);
-    HttpPost httpPost = new HttpPost(properties.getProperty("url"));
+    HttpPost httpPost = new HttpPost(properties.getProperty("urlSql"));
     Map<String, String> hashMap = new HashMap<String, String>();
     hashMap.put("query", sql);
     ObjectMapper objectMapper = new ObjectMapper();
@@ -56,11 +59,28 @@ public class CheckData {
     //System.out.println(responseString);
     String content = Json2Csv(responseString);
     if (content == null) {
+      System.out.println("null");
       return;
     }
+    writeToCsv(content, fileName);
     //System.out.println(content);
 
 
+  }
+  private static void writeToCsv(String content, String fileName) {
+    try {
+      File csv = new File(fileName);//CSV文件
+      BufferedWriter bw = new BufferedWriter(new FileWriter(csv, true));
+      bw.write(content);
+      bw.flush();
+      bw.close();
+    } catch (FileNotFoundException e) {
+      //捕获File对象生成时的异常
+      e.printStackTrace();
+    } catch (IOException e) {
+      //捕获BufferedWriter对象关闭时的异常
+      e.printStackTrace();
+    }
   }
 
   public static String Json2Csv(String json) throws JSONException {
